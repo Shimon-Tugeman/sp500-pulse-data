@@ -247,7 +247,8 @@ def main():
         shares = f.get("shares")
         cap = price * shares / cik_count[m["cik"]] / 1e9 if shares else None
         if not cap or cap < 2:  # every S&P 500 member is far above $2B; fall back to Yahoo's count
-            cap = yahoo_cap(s) or p.get("cap")
+            yc = yahoo_cap(s)  # Yahoo reports the whole company; split across share classes
+            cap = yc / cik_count[m["cik"]] if yc else p.get("cap")
         if f and f.get("period") and f["period"] < (dt.date.today() - dt.timedelta(days=550)).isoformat():
             f = {"rev": None, "eps": None, "epsTTM": None, "margin": None, "period": None}  # stale filings: show n/a
         if f and f.get("margin") is not None and not -100 <= f["margin"] <= 100:
