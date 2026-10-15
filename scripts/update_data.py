@@ -184,7 +184,7 @@ def fetch_facts(cik):
 
 
 def fundamentals(cik):
-    time.sleep(0.15)  # stay well under SEC's 10 requests/second
+    time.sleep(0.4)  # stay well under SEC's 10 requests/second
     f = fetch_facts(cik)
     if not f:
         return None
@@ -225,7 +225,7 @@ def main():
     ciks = sorted({m["cik"] for m in members})
     if not SEC_UA:
         log("SEC_CONTACT secret not set: skipping financial reports, keeping previous values")
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=3) as ex:
         fund = dict(zip(ciks, ex.map(fundamentals, ciks)))
     log(f"SEC reports: {sum(1 for v in fund.values() if v)}/{len(ciks)}")
     cik_count = {}
@@ -267,6 +267,8 @@ def main():
             "margin": f.get("margin", p.get("margin")) if f else p.get("margin"),
             "period": f.get("period", p.get("period")) if f else p.get("period"),
         }
+        if row["period"] and row["period"] < (dt.date.today() - dt.timedelta(days=550)).isoformat():
+            row.update(rev=None, eps=None, pe=None, margin=None, period=None)
         stocks.append(row)
         if dates is None or len(c) > len(dates):
             dates = [d.strftime("%Y-%m-%d") for d in c.index[-CHART_DAYS:]]
