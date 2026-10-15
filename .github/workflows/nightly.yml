@@ -1,0 +1,38 @@
+name: Nightly market data
+
+on:
+  schedule:
+    # 22:30 UTC, Monday–Friday: after the 16:00 New York close (summer and winter time)
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install packages
+        run: pip install -r requirements.txt
+      - name: Build data
+        env:
+          SEC_CONTACT: ${{ vars.SEC_CONTACT }}
+        run: python scripts/update_data.py
+      - name: Save results
+        run: |
+          git config user.name "sp500-pulse-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/latest.json docs/latest.json
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Market data $(date -u +%Y-%m-%d)"
+          git push
