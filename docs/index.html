@@ -1,0 +1,353 @@
+<title>S&amp;P 500 Pulse</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column of stacked instruments — controls, breadth strip, sector treemap, sector trend bars, mover lists; detail sheet slides over. */
+:root{
+  --bg:#f3f5f9; --panel:#ffffff; --ink:#151a2b; --muted:#5d667d; --line:#dde2ec;
+  --accent:#2c46c4; --accent-soft:#e6eafb;
+  --up:#13834f; --down:#c8323c; --warn:#a76a00;
+  --tile-text:#ffffff;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-data:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1320; --panel:#171c2c; --ink:#e7eaf3; --muted:#98a1b8; --line:#2a3147;
+  --accent:#8ea0ff; --accent-soft:#232b4d; --up:#3fbf7f; --down:#f0626b; --warn:#e3a53a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1320; --panel:#171c2c; --ink:#e7eaf3; --muted:#98a1b8; --line:#2a3147;
+  --accent:#8ea0ff; --accent-soft:#232b4d; --up:#3fbf7f; --down:#f0626b; --warn:#e3a53a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 16px}
+h1{font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:-.01em;margin:0;line-height:1.05}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin:4px 0 0}
+.badge{font-family:var(--f-data);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:3px 7px;white-space:nowrap}
+h2{font-family:var(--f-display);font-weight:600;font-size:17px;margin:0;text-wrap:balance}
+.label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:500}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{font:500 13px var(--f-body);color:var(--muted);background:transparent;border:0;border-radius:6px;padding:6px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg button:focus-visible,.tile:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat b{font-family:var(--f-data);font-weight:500;font-size:20px;font-variant-numeric:tabular-nums}
+.stat small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.breadth{height:6px;border-radius:3px;background:var(--down);overflow:hidden;margin-top:6px}
+.breadth i{display:block;height:100%;background:var(--up)}
+.mapHead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.legend{display:flex;align-items:center;gap:8px;font-family:var(--f-data);font-size:11px;color:var(--muted)}
+.legend .bar{width:140px;height:8px;border-radius:2px}
+#map{position:relative;width:100%;height:560px;border-radius:6px;overflow:hidden;background:var(--line)}
+.tile{position:absolute;overflow:hidden;color:var(--tile-text);font-family:var(--f-data);cursor:pointer;
+  border:1px solid var(--panel);padding:3px 4px;line-height:1.15;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+.tile .t{font-weight:500}
+.tile .v{opacity:.9}
+.sec-lab{position:absolute;font:600 10px var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:#fff;
+  background:rgba(0,0,0,.42);padding:1px 5px;border-radius:0 0 4px 0;pointer-events:none;white-space:nowrap;overflow:hidden;max-width:100%}
+.hint{color:var(--muted);font-size:12px;margin-top:8px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+.secRow{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 64px;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
+.secRow:last-child{border-bottom:0}
+.secRow .nm{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.secRow .track{position:relative;height:14px}
+.secRow .track::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--line)}
+.secRow .fill{position:absolute;top:0;height:100%;border-radius:2px}
+.secRow .num{font-family:var(--f-data);font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.movers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.list{display:flex;flex-direction:column}
+.list h3{font:600 14px var(--f-display);margin:0 0 6px;display:flex;justify-content:space-between}
+.row{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);
+  background:none;border-left:0;border-right:0;border-top:0;text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%}
+.row:hover{background:var(--accent-soft)}
+.row .tk{font-family:var(--f-data);font-weight:500}
+.row .nm{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .num{font-family:var(--f-data);font-variant-numeric:tabular-nums;font-size:13px}
+.up{color:var(--up)} .down{color:var(--down)}
+/* detail sheet */
+#sheet{position:fixed;inset:0;background:rgba(10,14,25,.45);display:flex;justify-content:flex-end;z-index:20}
+#sheet .card{background:var(--panel);width:min(460px,100%);height:100%;overflow-y:auto;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) 18px;
+  display:flex;flex-direction:column;gap:14px;border-left:1px solid var(--line)}
+.sheetTop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.sheetTop h2{font-size:22px}
+.close{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;width:34px;height:34px;font-size:18px;cursor:pointer;flex:none}
+.price{font-family:var(--f-data);font-size:26px;font-variant-numeric:tabular-nums}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}
+.kv div{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0;gap:8px}
+.kv span:last-child{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+.chartBox svg{display:block;width:100%;height:auto}
+.chartBox text{fill:var(--muted);font:10px var(--f-data)}
+@media (max-width:760px){
+  .strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid2,.movers{grid-template-columns:minmax(0,1fr)}
+  #map{height:520px}
+  h1{font-size:24px}
+}
+@media (prefers-reduced-motion:no-preference){.tile{transition:background-color .35s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>S&amp;P 500 <span>Pulse</span></h1>
+      <p class="sub" id="asof">S&amp;P 500 · 11 GICS sectors · tiles sized by market cap</p>
+    </div>
+    <span class="badge" id="badge" title="Closing prices and volume from Yahoo Finance; financial reports from SEC EDGAR filings. Updated each weekday after the New York close.">Daily close</span>
+  </header>
+
+  <div class="panel controls" role="group" aria-label="Heat map settings">
+    <div>
+      <div class="label" style="margin-bottom:4px">Color by</div>
+      <div class="seg" id="metricSeg">
+        <button id="m-price" data-m="price" aria-pressed="true">Price change</button>
+        <button id="m-vol" data-m="vol" aria-pressed="false">Volume surge</button>
+        <button id="m-earn" data-m="earn" aria-pressed="false">Earnings growth</button>
+        <button id="m-val" data-m="val" aria-pressed="false">Valuation</button>
+      </div>
+    </div>
+    <div id="periodWrap">
+      <div class="label" style="margin-bottom:4px">Period</div>
+      <div class="seg" id="periodSeg">
+        <button id="p-1d" data-p="1d" aria-pressed="true">1D</button>
+        <button id="p-1w" data-p="1w" aria-pressed="false">1W</button>
+        <button id="p-1m" data-p="1m" aria-pressed="false">1M</button>
+        <button id="p-ytd" data-p="ytd" aria-pressed="false">YTD</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="panel strip" aria-label="Market summary" id="strip"></section>
+
+  <section class="panel">
+    <div class="mapHead">
+      <h2 id="mapTitle">Heat map</h2>
+      <div class="legend"><span id="lgLo"></span><span class="bar" id="lgBar"></span><span id="lgHi"></span></div>
+    </div>
+    <div id="map" role="list" aria-label="Companies by sector"></div>
+    <p class="hint">Tap any company for its 6-month price and volume chart and report figures.</p>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <h2 id="secTitle" style="margin-bottom:8px">Sector trend</h2>
+      <div id="sectors"></div>
+    </section>
+    <section class="panel">
+      <h2 style="margin-bottom:8px">Sector fundamentals</h2>
+      <div id="secFund"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="movers">
+      <div class="list" id="gainers"></div>
+      <div class="list" id="losers"></div>
+      <div class="list" id="volume"></div>
+    </div>
+  </section>
+</div>
+
+<div id="sheet" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="dTitle" id="sheetCard"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+const RAW = /*DATA*/null;
+let DATA=[], DATES=[];
+const state={metric:'price',period:'1d'};
+try{const s=JSON.parse(localStorage.getItem('pulse-ui')||'{}');if(s.metric)state.metric=s.metric;if(s.period)state.period=s.period;}catch(e){}
+
+const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+function prep(raw){
+DATA=raw.stocks.filter(d=>d.px&&d.px.length>25); DATES=raw.dates||[];
+DATA.forEach(d=>{
+  if(!d.cap) d.cap=5;
+  const px=d.px,n=px.length,last=px[n-1];
+  d.price=last;
+  d.r={'1d':last/px[n-2]-1,'1w':last/px[n-6]-1,'1m':last/px[n-22]-1,'ytd':last/d.ytd0-1};
+  d.surge=d.vol[n-1]/avg(d.vol.slice(n-21,n-1));
+});
+const fmtD=x=>new Date(x+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+document.getElementById('badge').textContent='Daily close · '+fmtD(raw.asOf);
+document.getElementById('asof').textContent=DATA.length+' companies · 11 GICS sectors · tiles sized by market cap';
+}
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const pct=(x,dp=1)=>(x>0?'+':'')+(x*100).toFixed(dp)+'%';
+const fmtCap=b=>b>=1000?(b/1000).toFixed(2)+'T':b.toFixed(0)+'B';
+
+// diverging market palette, readable with white text at both ends
+const RED='#b3212f',RED2='#e0646c',MID='#4a5068',GRN2='#3ba06a',GRN='#0d6e3f';
+const scales={
+  price:p=>{const lim={'1d':.03,'1w':.06,'1m':.12,'ytd':.35}[p];
+    return {f:d3.scaleLinear().domain([-lim,-lim/3,0,lim/3,lim]).range([RED,RED2,MID,GRN2,GRN]).clamp(true),
+      val:d=>d.r[p],lo:pct(-lim,0),hi:pct(lim,0),fmt:v=>pct(v,p==='1d'?2:1),
+      title:'Price change · '+p.toUpperCase()};},
+  vol:()=>({f:d3.scaleLinear().domain([.6,1,1.6,3]).range(['#3d4560','#4a5068','#b07a1c','#e8a21a']).clamp(true),
+      val:d=>d.surge,lo:'0.6×',hi:'3×+',fmt:v=>v.toFixed(1)+'×',title:'Volume vs. 20-day average'}),
+  earn:()=>({f:d3.scaleLinear().domain([-25,-8,0,10,30]).range([RED,RED2,MID,GRN2,GRN]).clamp(true),
+      val:d=>d.eps,lo:'−25%',hi:'+30%',fmt:v=>(v>0?'+':'')+v.toFixed(0)+'%',title:'EPS growth · latest report, year over year'}),
+  val:()=>({f:d3.scaleLinear().domain([8,16,24,40]).range(['#1b6f8a','#3d8fa3','#6b5a8a','#8e3b6e']).clamp(true),
+      val:d=>d.pe,lo:'P/E 8',hi:'P/E 40+',fmt:v=>v.toFixed(0)+'×',title:'Valuation · trailing P/E (n/a = no profit)'})
+};
+const NA='#8a8f9c';
+const cur=()=>{const s=scales[state.metric](state.period);const f=s.f,fmt=s.fmt;
+  return {...s,f:Object.assign(v=>v==null||isNaN(v)?NA:f(v),{domain:()=>f.domain()}),fmt:v=>v==null||isNaN(v)?'n/a':fmt(v)};};
+
+// ---------- treemap ----------
+const mapEl=document.getElementById('map');
+function drawMap(){
+  if(!DATA.length) return;
+  const s=cur(), W=mapEl.clientWidth, H=mapEl.clientHeight;
+  const root=d3.hierarchy({children:d3.groups(DATA,d=>d.sec).map(([k,v])=>({name:k,children:v}))})
+    .sum(d=>d.cap||0).sort((a,b)=>b.value-a.value);
+  d3.treemap().size([W,H]).paddingTop(14).paddingInner(1).paddingOuter(1).round(true)(root);
+  const frag=document.createDocumentFragment();
+  root.leaves().forEach(l=>{
+    const d=l.data,w=l.x1-l.x0,h=l.y1-l.y0,v=s.val(d);
+    const el=document.createElement('div');
+    el.className='tile';el.tabIndex=0;el.setAttribute('role','listitem');
+    el.style.cssText=`left:${l.x0}px;top:${l.y0}px;width:${w}px;height:${h}px;background:${s.f(v)}`;
+    el.setAttribute('aria-label',`${d.n} ${s.fmt(v)}`);el.title=`${d.s} · ${d.n}\n${s.fmt(v)}`;
+    if(w>34&&h>18){
+      const fs=Math.max(9,Math.min(22,Math.sqrt(w*h)/5.5));
+      el.innerHTML=`<span class="t" style="font-size:${fs}px">${d.s}</span>`+(h>fs*2.4&&w>44?`<span class="v" style="font-size:${Math.max(9,fs*.7)}px">${s.fmt(v)}</span>`:'');
+    }
+    el.onclick=()=>openDetail(d);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(d)}};
+    frag.appendChild(el);
+  });
+  root.children.forEach(c=>{
+    const lab=document.createElement('div');lab.className='sec-lab';
+    lab.style.left=c.x0+'px';lab.style.top=c.y0+'px';lab.style.maxWidth=(c.x1-c.x0)+'px';
+    lab.textContent=c.data.name;frag.appendChild(lab);
+  });
+  mapEl.replaceChildren(frag);
+  document.getElementById('mapTitle').textContent=s.title;
+  document.getElementById('lgLo').textContent=s.lo;document.getElementById('lgHi').textContent=s.hi;
+  const dom=s.f.domain();document.getElementById('lgBar').style.background=
+    `linear-gradient(90deg,${dom.map(x=>s.f(x)).join(',')})`;
+}
+
+// ---------- summary strip ----------
+function capW(arr,fn){const t=d3.sum(arr,d=>d.cap);return d3.sum(arr,d=>fn(d)*d.cap)/t;}
+function drawStrip(){
+  const p=state.period, adv=DATA.filter(d=>d.r[p]>0).length, idx=capW(DATA,d=>d.r[p]);
+  const secs=d3.groups(DATA,d=>d.sec).map(([k,v])=>({k,r:capW(v,d=>d.r[p])})).sort((a,b)=>b.r-a.r);
+  const hot=DATA.filter(d=>d.surge>=2).length;
+  document.getElementById('strip').innerHTML=`
+   <div class="stat"><span class="label">Cap-weighted move · ${p.toUpperCase()}</span><b class="${idx>=0?'up':'down'}">${pct(idx,2)}</b><small>All 503 members</small></div>
+   <div class="stat"><span class="label">Breadth</span><b>${adv} <span style="color:var(--muted);font-size:14px">/ ${DATA.length} up</span></b>
+     <div class="breadth" aria-hidden="true"><i style="width:${adv/DATA.length*100}%"></i></div></div>
+   <div class="stat"><span class="label">Leading sector</span><b class="up">${pct(secs[0].r)}</b><small>${secs[0].k}</small></div>
+   <div class="stat"><span class="label">Unusual volume</span><b>${hot}</b><small>stocks trading ≥2× their 20-day average</small></div>`;
+}
+
+// ---------- sector panels ----------
+function drawSectors(){
+  const p=state.period;
+  const secs=d3.groups(DATA,d=>d.sec).map(([k,v])=>({k,v,r:capW(v,d=>d.r[p]),
+    eps:d3.median(v,d=>d.eps)??0,rev:d3.median(v,d=>d.rev)??0,pe:d3.median(v,d=>d.pe)??0,cap:d3.sum(v,d=>d.cap)})).sort((a,b)=>b.r-a.r);
+  const m=d3.max(secs,s=>Math.abs(s.r))||1;
+  document.getElementById('secTitle').textContent='Sector trend · '+p.toUpperCase()+' (cap-weighted)';
+  document.getElementById('sectors').innerHTML=secs.map(s=>{
+    const w=Math.abs(s.r)/m*50, left=s.r>=0?50:50-w;
+    return `<div class="secRow"><span class="nm" title="${s.k}">${s.k}</span>
+      <span class="track"><span class="fill" style="left:${left}%;width:${w}%;background:${s.r>=0?'var(--up)':'var(--down)'}"></span></span>
+      <span class="num ${s.r>=0?'up':'down'}">${pct(s.r)}</span></div>`}).join('');
+  const f=[...secs].sort((a,b)=>b.eps-a.eps);
+  document.getElementById('secFund').innerHTML=
+   `<div class="secRow" style="grid-template-columns:minmax(0,1fr) 60px 60px 50px"><span class="label">Sector</span><span class="label" style="text-align:right">EPS gr.</span><span class="label" style="text-align:right">Rev gr.</span><span class="label" style="text-align:right">P/E</span></div>`+
+   f.map(s=>`<div class="secRow" style="grid-template-columns:minmax(0,1fr) 60px 60px 50px"><span class="nm">${s.k}</span>
+     <span class="num ${s.eps>=0?'up':'down'}">${(s.eps>0?'+':'')+s.eps.toFixed(1)}%</span>
+     <span class="num ${s.rev>=0?'up':'down'}">${(s.rev>0?'+':'')+s.rev.toFixed(1)}%</span>
+     <span class="num">${s.pe.toFixed(0)}×</span></div>`).join('')+
+   `<p class="hint">Medians across each sector's members, latest reported quarter vs. a year earlier.</p>`;
+}
+
+// ---------- movers ----------
+function rowHtml(d,val,cls){return `<button class="row" data-s="${d.s}"><span class="tk">${d.s}</span><span class="nm">${d.n}</span><span class="num ${cls}">${val}</span></button>`}
+function drawMovers(){
+  const p=state.period,by=[...DATA].sort((a,b)=>b.r[p]-a.r[p]);
+  document.getElementById('gainers').innerHTML=`<h3>Top gainers <span class="label">${p.toUpperCase()}</span></h3>`+by.slice(0,8).map(d=>rowHtml(d,pct(d.r[p]),'up')).join('');
+  document.getElementById('losers').innerHTML=`<h3>Top decliners <span class="label">${p.toUpperCase()}</span></h3>`+by.slice(-8).reverse().map(d=>rowHtml(d,pct(d.r[p]),'down')).join('');
+  const v=[...DATA].sort((a,b)=>b.surge-a.surge).slice(0,8);
+  document.getElementById('volume').innerHTML=`<h3>Volume spikes <span class="label">last session</span></h3>`+v.map(d=>rowHtml(d,d.surge.toFixed(1)+'× · '+pct(d.r['1d']),d.r['1d']>=0?'up':'down')).join('');
+  document.querySelectorAll('.list .row').forEach(b=>b.onclick=()=>openDetail(DATA.find(d=>d.s===b.dataset.s)));
+}
+
+// ---------- detail sheet ----------
+const sheet=document.getElementById('sheet'),card=document.getElementById('sheetCard');let lastFocus=null;
+function chartSvg(d){
+  const W=420,H=230,ph=150,vt=170,vb=210,L=38,R=8,n=d.px.length;
+  const x=d3.scaleLinear().domain([0,n-1]).range([L,W-R]);
+  const y=d3.scaleLinear().domain(d3.extent(d.px)).nice(4).range([ph,10]);
+  const vy=d3.scaleLinear().domain([0,d3.max(d.vol)]).range([vb,vt]);
+  const line=d3.line().x((_,i)=>x(i)).y(v=>y(v))(d.px);
+  const area=d3.area().x((_,i)=>x(i)).y0(ph).y1(v=>y(v))(d.px);
+  const upC=d.px[n-1]>=d.px[0]?css('--up'):css('--down');
+  const ma=d.vol.map((_,i)=>i<19?null:avg(d.vol.slice(i-19,i+1)));
+  const bw=(W-L-R)/n;
+  const grid=y.ticks(4).map(t=>`<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L-5}" y="${y(t)+3}" text-anchor="end">${t}</text>`).join('');
+  const bars=d.vol.map((v,i)=>{const hot=ma[i]&&v>ma[i]*2;return `<rect x="${x(i)-bw/2+.3}" y="${vy(v)}" width="${Math.max(.6,bw-.6)}" height="${vb-vy(v)}" fill="${hot?css('--warn'):'var(--muted)'}" opacity="${hot?1:.45}"/>`}).join('');
+  const mal=d3.line().defined(v=>v!=null).x((_,i)=>x(i)).y(v=>vy(v))(ma);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${d.s} price and volume, last 6 months">
+    <defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${upC}" stop-opacity=".28"/><stop offset="1" stop-color="${upC}" stop-opacity="0"/></linearGradient></defs>
+    ${grid}<path d="${area}" fill="url(#ga)"/><path d="${line}" fill="none" stroke="${upC}" stroke-width="1.6"/>
+    <circle cx="${x(n-1)}" cy="${y(d.px[n-1])}" r="3.2" fill="${upC}"/>
+    ${bars}<path d="${mal}" fill="none" stroke="var(--accent)" stroke-width="1.2"/>
+    <text x="${L}" y="${vt-4}">Volume · line = 20-day avg · amber = 2× or more</text>
+    <text x="${L}" y="${H-4}">${DATES.length?DATES[Math.max(0,DATES.length-n)]:'6M ago'}</text><text x="${W-R}" y="${H-4}" text-anchor="end">${DATES.length?DATES[DATES.length-1]:'Today'}</text></svg>`;
+}
+function openDetail(d){
+  lastFocus=document.activeElement;
+  const c=v=>v==null?'':v>=0?'up':'down';
+  const g=v=>v==null?'n/a':(v>0?'+':'')+v+'%';
+  card.innerHTML=`<div class="sheetTop"><div><span class="label">${d.sec} · ${d.ind}</span><h2 id="dTitle">${d.n}</h2>
+      <span style="font-family:var(--f-data);color:var(--muted)">${d.s} · cap ${fmtCap(d.cap)}</span></div>
+      <button class="close" id="closeBtn" aria-label="Close">×</button></div>
+    <div><span class="price">$${d.price.toFixed(2)}</span> <span class="${c(d.r['1d'])}" style="font-family:var(--f-data)">${pct(d.r['1d'],2)} last session</span></div>
+    <div class="chartBox">${chartSvg(d)}</div>
+    <div><div class="label" style="margin-bottom:4px">Price trend</div><div class="kv">
+      <div><span>1 week</span><span class="${c(d.r['1w'])}">${pct(d.r['1w'])}</span></div>
+      <div><span>1 month</span><span class="${c(d.r['1m'])}">${pct(d.r['1m'])}</span></div>
+      <div><span>YTD</span><span class="${c(d.r.ytd)}">${pct(d.r.ytd)}</span></div>
+      <div><span>Volume, last session</span><span>${d.surge.toFixed(1)}× avg</span></div></div></div>
+    <div><div class="label" style="margin-bottom:4px">Latest financial report</div><div class="kv">
+      <div><span>Revenue growth</span><span class="${c(d.rev)}">${g(d.rev)}</span></div>
+      <div><span>EPS growth</span><span class="${c(d.eps)}">${g(d.eps)}</span></div>
+      <div><span>Net margin</span><span>${d.margin==null?'n/a':d.margin+'%'}</span></div>
+      <div><span>P/E (trailing)</span><span>${d.pe==null?'n/a':d.pe+'×'}</span></div></div></div>
+    <p class="hint">From SEC filings${d.period?', period ending '+d.period:''}. Growth compares that period with the same period a year earlier; margin and P/E use the last twelve months.</p>`;
+  sheet.hidden=false;document.getElementById('closeBtn').onclick=closeDetail;document.getElementById('closeBtn').focus();
+}
+function closeDetail(){sheet.hidden=true;lastFocus&&lastFocus.focus&&lastFocus.focus();}
+sheet.addEventListener('click',e=>{if(e.target===sheet)closeDetail()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!sheet.hidden)closeDetail()});
+
+// ---------- controls ----------
+function syncButtons(){
+  document.querySelectorAll('#metricSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===state.metric));
+  document.querySelectorAll('#periodSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===state.period));
+  document.getElementById('periodWrap').style.opacity=state.metric==='price'?1:.55;
+}
+function save(){try{localStorage.setItem('pulse-ui',JSON.stringify(state))}catch(e){}}
+document.querySelectorAll('#metricSeg button').forEach(b=>b.onclick=()=>{state.metric=b.dataset.m;save();render()});
+document.querySelectorAll('#periodSeg button').forEach(b=>b.onclick=()=>{state.period=b.dataset.p;save();render()});
+function render(){syncButtons();drawMap();drawStrip();drawSectors();drawMovers();}
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(drawMap,150)});
+async function boot(){
+  let raw=RAW;
+  if(!raw){try{raw=await (await fetch('latest.json',{cache:'no-cache'})).json()}catch(e){document.getElementById('asof').textContent='Could not load market data. Try reloading the page.';return}}
+  prep(raw);render();
+}
+boot();
+</script>

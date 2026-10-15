@@ -257,6 +257,7 @@ def main():
     out = {"asOf": dates[-1], "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"),
            "dates": dates, "stocks": stocks}
     for path in (OUT, PAGES_OUT):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as fh:
             json.dump(out, fh, separators=(",", ":"))
     log(f"wrote {len(stocks)} stocks, as of {out['asOf']}")
