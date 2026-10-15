@@ -73,6 +73,7 @@ h2{font-family:var(--f-display);font-weight:600;font-size:17px;margin:0;text-wra
 .row .num{font-family:var(--f-data);font-variant-numeric:tabular-nums;font-size:13px}
 .up{color:var(--up)} .down{color:var(--down)}
 /* detail sheet */
+[hidden]{display:none!important}
 #sheet{position:fixed;inset:0;background:rgba(10,14,25,.45);display:flex;justify-content:flex-end;z-index:20}
 #sheet .card{background:var(--panel);width:min(460px,100%);height:100%;overflow-y:auto;
   padding:calc(16px + env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) 18px;
@@ -244,7 +245,7 @@ function drawStrip(){
   const secs=d3.groups(DATA,d=>d.sec).map(([k,v])=>({k,r:capW(v,d=>d.r[p])})).sort((a,b)=>b.r-a.r);
   const hot=DATA.filter(d=>d.surge>=2).length;
   document.getElementById('strip').innerHTML=`
-   <div class="stat"><span class="label">Cap-weighted move · ${p.toUpperCase()}</span><b class="${idx>=0?'up':'down'}">${pct(idx,2)}</b><small>All 503 members</small></div>
+   <div class="stat"><span class="label">Cap-weighted move · ${p.toUpperCase()}</span><b class="${idx>=0?'up':'down'}">${pct(idx,2)}</b><small>All ${DATA.length} members</small></div>
    <div class="stat"><span class="label">Breadth</span><b>${adv} <span style="color:var(--muted);font-size:14px">/ ${DATA.length} up</span></b>
      <div class="breadth" aria-hidden="true"><i style="width:${adv/DATA.length*100}%"></i></div></div>
    <div class="stat"><span class="label">Leading sector</span><b class="up">${pct(secs[0].r)}</b><small>${secs[0].k}</small></div>
