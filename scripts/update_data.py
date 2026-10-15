@@ -24,17 +24,20 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "data", "latest.json")
 PAGES_OUT = os.path.join(ROOT, "docs", "latest.json")
 CHART_DAYS = 130  # about 6 months of trading days
-SEC_UA = os.environ.get("SEC_CONTACT") or "SP500PulseData/1.0 (github.com/Shimon-Tugeman/sp500-pulse-data)"
+SEC_UA = os.environ.get("SEC_CONTACT", "").strip()
+WIKI_UA = "SP500PulseData/1.0 (github.com/Shimon-Tugeman/sp500-pulse-data)"
+SEC_BLOCKED = False
 
 
 def log(*a):
-    print(*a, flush=True)
+    # "::notice::" lines show up as annotations on the GitHub run page
+    print("::notice::" + " ".join(str(x) for x in a), flush=True)
 
 
 # ---------------------------------------------------------------- members
 def load_members():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    html = requests.get(url, headers={"User-Agent": SEC_UA}, timeout=30).text
+    html = requests.get(url, headers={"User-Agent": WIKI_UA}, timeout=30).text
     t = pd.read_html(io.StringIO(html), attrs={"id": "constituents"})[0]
     t = t.rename(columns={"Symbol": "s", "Security": "n", "GICS Sector": "sec",
                           "GICS Sub-Industry": "ind", "CIK": "cik"})
@@ -156,6 +159,9 @@ def shares_out(facts):
 
 
 def fetch_facts(cik):
+    global SEC_BLOCKED
+    if SEC_BLOCKED or not SEC_UA:
+        return None
     url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
     for attempt in range(3):
         try:
@@ -163,6 +169,10 @@ def fetch_facts(cik):
             if r.status_code == 200:
                 return r.json().get("facts", {})
             if r.status_code == 404:
+                return None
+            if r.status_code == 403:
+                SEC_BLOCKED = True
+                log("SEC refused the request (403); check the SEC_CONTACT secret")
                 return None
         except Exception:
             pass
@@ -200,6 +210,8 @@ def main():
     closes, vols = load_prices(symbols)
 
     ciks = sorted({m["cik"] for m in members})
+    if not SEC_UA:
+        log("SEC_CONTACT secret not set: skipping financial reports, keeping previous values")
     with ThreadPoolExecutor(max_workers=6) as ex:
         fund = dict(zip(ciks, ex.map(fundamentals, ciks)))
     log(f"SEC reports: {sum(1 for v in fund.values() if v)}/{len(ciks)}")
@@ -251,4 +263,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        import traceback
+        print("::error::" + traceback.format_exc().replace("\n", "%0A"), flush=True)
+        sys.exit(1)

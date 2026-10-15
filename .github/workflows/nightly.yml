@@ -18,15 +18,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install packages
         run: pip install -r requirements.txt
       - name: Build data
         env:
-          SEC_CONTACT: ${{ vars.SEC_CONTACT }}
+          SEC_CONTACT: ${{ secrets.SEC_CONTACT }}
         run: python scripts/update_data.py
       - name: Save results
         run: |
