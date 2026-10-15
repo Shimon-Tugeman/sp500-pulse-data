@@ -63,6 +63,9 @@ def load_prices(symbols):
                     if y not in df.columns.get_level_values(0):
                         continue
                     sub = df[y][["Close", "Volume"]].dropna()
+                    now = dt.datetime.utcnow()
+                    if len(sub) and sub.index[-1].date() == now.date() and now.hour * 60 + now.minute < 20 * 60 + 15:
+                        sub = sub.iloc[:-1]  # market still open: keep only finished days
                     if len(sub) > 30:
                         closes[s] = sub["Close"]
                         vols[s] = sub["Volume"]
@@ -196,6 +199,16 @@ def fundamentals(cik):
             "shares": shares_out(f), "period": eps_end or rev_end}
 
 
+def yahoo_cap(symbol):
+    try:
+        info = yf.Ticker(symbol.replace(".", "-")).fast_info
+        mc = info.get("marketCap") or info.get("market_cap")
+        return mc / 1e9 if mc else None
+    except Exception as e:
+        log(f"Yahoo market cap failed for {symbol}: {e}")
+        return None
+
+
 # ---------------------------------------------------------------- build
 def main():
     prev = {}
@@ -232,7 +245,13 @@ def main():
         f = fund.get(m["cik"]) or {}
         price = float(c.iloc[-1])
         shares = f.get("shares")
-        cap = price * shares / cik_count[m["cik"]] / 1e9 if shares else p.get("cap")
+        cap = price * shares / cik_count[m["cik"]] / 1e9 if shares else None
+        if not cap or cap < 2:  # every S&P 500 member is far above $2B; fall back to Yahoo's count
+            cap = yahoo_cap(s) or p.get("cap")
+        if f and f.get("period") and f["period"] < (dt.date.today() - dt.timedelta(days=550)).isoformat():
+            f = {"rev": None, "eps": None, "epsTTM": None, "margin": None, "period": None}  # stale filings: show n/a
+        if f and f.get("margin") is not None and not -100 <= f["margin"] <= 100:
+            f["margin"] = None
         eps_ttm = f.get("epsTTM")
         pe = round(price / eps_ttm, 1) if eps_ttm and eps_ttm > 0 else None
         row = {
