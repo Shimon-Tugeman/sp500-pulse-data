@@ -199,6 +199,37 @@ def fundamentals(cik):
             "shares": shares_out(f), "period": eps_end or rev_end}
 
 
+INDICES = [("S&P 500", "^GSPC"), ("Nasdaq 100", "^NDX")]
+
+
+def prev_indices(path):
+    try:
+        return json.load(open(path)).get("indices", [])
+    except Exception:
+        return []
+
+
+def load_indices(as_of, previous):
+    """Last close and 1-day change of the headline indices, on the same day as the stock data."""
+    out = []
+    for name, sym in INDICES:
+        try:
+            c = yf.download(sym, period="3mo", auto_adjust=False, progress=False)["Close"].dropna()
+            c = c.iloc[:, 0] if hasattr(c, "columns") else c
+            c = c[c.index.strftime("%Y-%m-%d") <= as_of]
+            last, prev = float(c.iloc[-1]), float(c.iloc[-2])
+            out.append({"name": name, "sym": sym, "date": c.index[-1].strftime("%Y-%m-%d"),
+                        "close": round(last, 2), "chg": round(last - prev, 2),
+                        "pct": round((last / prev - 1) * 100, 2)})
+        except Exception as e:
+            log(f"index {sym} failed: {e}")
+            old = next((x for x in previous if x.get("sym") == sym), None)
+            if old:
+                out.append(old)
+    log("indices: " + ", ".join(f"{x['name']} {x['close']} ({x['pct']:+.2f}%)" for x in out))
+    return out
+
+
 def yahoo_cap(symbol):
     try:
         info = yf.Ticker(symbol.replace(".", "-")).fast_info
@@ -277,7 +308,7 @@ def main():
         log("too few stocks, keeping previous file")
         sys.exit(1)
     out = {"asOf": dates[-1], "generated": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"),
-           "dates": dates, "stocks": stocks}
+           "dates": dates, "indices": load_indices(dates[-1], prev_indices(OUT)), "stocks": stocks}
     for path in (OUT, PAGES_OUT):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as fh:
